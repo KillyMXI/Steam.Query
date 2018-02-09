@@ -20,11 +20,11 @@ namespace Steam.Query.Tests.IntegrationTests
         private const int GetInfoAttempts = 4;
         private const int GetPlayersAttempts = 4;
 
-        [TestFixtureSetUp]
+        [OneTimeSetUp]
         public void Setup() //Should be async, but isn't currently supported by NUnit
         {
             var client = new MasterServer();
-            _servers = client.GetServersAsync(MasterServerRegion.Europe, Filter.GamedirIs("tf"), Filter.NameMatches("Valve*")).Result.ToList().Shuffle();
+            _servers = client.GetServersAsync(MasterServerRegion.Europe, Filter.GamedirIs("tf")).Result.ToList().Shuffle();
         }
 
         [Test]
@@ -59,7 +59,7 @@ namespace Steam.Query.Tests.IntegrationTests
         {
             var server = new GameServer(new IPEndPoint(IPAddress.Parse("1.1.1.1"), 65534));
 
-            Assert.Throws<TimeoutException>(async () => await server.GetServerInfoAsync());
+            Assert.ThrowsAsync<TimeoutException>(async () => await server.GetServerInfoAsync());
         }
 
         private static readonly Regex RuleStringRegex = new Regex(@"^[A-Za-z0-9;,\.\-_]+$");
@@ -82,7 +82,7 @@ namespace Steam.Query.Tests.IntegrationTests
 
                     Assert.That(serverInfo.Gamedir, Is.EqualTo("tf"));
                     Assert.That(serverInfo.Type, Is.EqualTo(GameServerType.Dedicated));
-                    Assert.That(serverInfo.Name, Is.StringStarting("Valve"));
+                    Assert.That(serverInfo.Name, Is.Not.Empty);
                     Assert.That(serverInfo.Ping, Is.InRange(1, 800));
 
                     return;
