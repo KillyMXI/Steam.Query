@@ -169,12 +169,12 @@ namespace Steam.Query.GameServers
             {
                 using (var client = SteamAgent.GetUdpClient(EndPoint))
                 {
-                    var requestPacket = GetRequestPacket(GameServerQueryPacketType.RulesRequest);
-                    requestPacket.WriteLong(-1);
+                    var challengeRequestPacket = GetRequestPacket(GameServerQueryPacketType.RulesRequest);
+                    challengeRequestPacket.WriteLong(-1); // fill in -1 (0xFFFFFFFF) to request a challenge number
 
-                    var reader = await SteamAgent.RequestResponseAsync(client, requestPacket.ToArray(), 4);
+                    var challengeReader = await SteamAgent.RequestResponseAsync(client, challengeRequestPacket.ToArray(), 4);
 
-                    var responseType = reader.ReadEnum<GameServerQueryPacketType>();
+                    var responseType = challengeReader.ReadEnum<GameServerQueryPacketType>();
 
                     if (responseType == GameServerQueryPacketType.RulesResponse)
                         throw new NotImplementedException();
@@ -182,18 +182,31 @@ namespace Steam.Query.GameServers
                     if (responseType != GameServerQueryPacketType.RequestChallenge)
                         throw new ProtocolViolationException();
 
-                    var challengeNumber = reader.ReadLong();
-                    requestPacket = GetRequestPacket(GameServerQueryPacketType.RulesRequest);
-                    requestPacket.WriteLong(challengeNumber);
+                    var challengeNumber = challengeReader.ReadLong();
+                    var rulesRequestPacket = GetRequestPacket(GameServerQueryPacketType.RulesRequest);
+                    rulesRequestPacket.WriteLong(challengeNumber); // now fill in the challenge number to get the rules
 
-                    reader = await SteamAgent.RequestResponseAsync(client, requestPacket.ToArray(), 16); //seems not to agree with protocol, would expect this 11 bytes earlier...
+                    var rulesReader = await SteamAgent.RequestResponseAsync(client, rulesRequestPacket.ToArray(), 0); // have to check for multi-packeted response
+                    var responseFormat = rulesReader.ReadEnum<GameServerResponseFormat, int>();
+                    if (responseFormat == GameServerResponseFormat.MultiPacket)
+                    {
+                        var id = rulesReader.ReadLong(); // msb 1 might signify compression
+                        var totalPackets = rulesReader.ReadByte();
+                        var thisPacketNumber = rulesReader.ReadByte();
+                        var maxSize = rulesReader.ReadShort(); // maximum single packet size (0x04E0 by default). might be absent in some games
 
-                    responseType = reader.ReadEnum<GameServerQueryPacketType>();
+                        var regularResponseHeader = rulesReader.ReadEnum<GameServerResponseFormat, int>(); // consume regular header that arrives after multi-packet header
+
+                        if (regularResponseHeader != GameServerResponseFormat.Simple)
+                            throw new ProtocolViolationException();
+                    }
+                    
+                    responseType = rulesReader.ReadEnum<GameServerQueryPacketType>();
 
                     if (responseType != GameServerQueryPacketType.RulesResponse)
                         throw new ProtocolViolationException();
 
-                    var ruleCount = reader.ReadShort();
+                    var ruleCount = rulesReader.ReadShort();
                     var rules = new List<GameServerRule>(ruleCount);
 
                     var packetsReceived = 1;
@@ -204,7 +217,7 @@ namespace Steam.Query.GameServers
                         return next;
                     };
 
-                    var multiPacketStringReader = new MultiPacketStringReader(reader, sequelRequestAsyncFunc);
+                    var multiPacketStringReader = new MultiPacketStringReader(rulesReader, sequelRequestAsyncFunc);
 
                     for (var i = 0; i < ruleCount; i++)
                     {
