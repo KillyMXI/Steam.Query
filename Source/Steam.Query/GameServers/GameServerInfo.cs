@@ -19,9 +19,9 @@ namespace Steam.Query.GameServers
         public GameServerEnvironment Environment { get; private set; }
         public bool HasPassword { get; private set; }
         public string Version { get; private set; }
-        public ushort Ping { get; set; }
+        public ushort? Ping { get; set; }
 
-        internal static GameServerInfo Parse(IGameServer server, ushort ping, BufferReader reader)
+        internal static GameServerInfo Parse(IGameServer server, ushort? ping, BufferReader reader)
         {
             var result = new GameServerInfo
             {

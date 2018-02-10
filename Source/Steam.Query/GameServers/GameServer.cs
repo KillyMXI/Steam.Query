@@ -265,15 +265,14 @@ namespace Steam.Query.GameServers
             return await task.TimeoutAfter(timeout);
         }
 
-        public async Task<ushort> SendPing()
+        public async Task<ushort?> SendPing()
         {
             var ping = new Ping();
             var reply = await ping.SendPingAsync(EndPoint.Address);
-
-            if (reply.Status != IPStatus.Success)
-                throw new TimeoutException();
-
-            return (ushort)reply.RoundtripTime;
+            
+            return (reply.Status == IPStatus.Success)
+                ? (ushort?)reply.RoundtripTime
+                : null;
         }
 
         public override string ToString()
