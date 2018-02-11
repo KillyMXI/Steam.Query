@@ -56,19 +56,19 @@ namespace Steam.Query.GameServers
             }
         }
 
-        public async Task<IGameServerInfo> GetServerInfoAsync(bool forceRefresh = false, TimeSpan? timeout = null)
+        public async Task<IGameServerInfo> GetServerInfoAsync(bool forceRefresh = false, TimeSpan? timeout = null, bool checkPing = true)
         {
             if (forceRefresh || _info == null)
-                return await QueryServerInfoAsync(timeout ?? DefaultTimeout);
+                return await QueryServerInfoAsync(timeout ?? DefaultTimeout, checkPing);
 
             return _info;
         }
 
-        public async Task<IGameServerInfo> TryGetServerInfoAsync(bool forceRefresh = false, TimeSpan? timeout = null)
+        public async Task<IGameServerInfo> TryGetServerInfoAsync(bool forceRefresh = false, TimeSpan? timeout = null, bool checkPing = true)
         {
             try
             {
-                return await GetServerInfoAsync(forceRefresh, timeout);
+                return await GetServerInfoAsync(forceRefresh, timeout, checkPing);
             }
             catch (TimeoutException)
             {
@@ -235,7 +235,7 @@ namespace Steam.Query.GameServers
             return await task.TimeoutAfter(timeout);
         }
 
-        private async Task<GameServerInfo> QueryServerInfoAsync(TimeSpan timeout)
+        private async Task<GameServerInfo> QueryServerInfoAsync(TimeSpan timeout, bool checkPing = true)
         {
             var task = Task.Run(async () =>
             {
@@ -244,7 +244,7 @@ namespace Steam.Query.GameServers
                     var requestPacket = GetRequestPacket(GameServerQueryPacketType.InfoRequest);
                     requestPacket.WriteString("Source Engine Query");
 
-                    var pingTask = SendPing();
+                    var pingTask = (checkPing) ? SendPing() : Task.FromResult<ushort?>(null);
                     var responseTask = SteamAgent.RequestResponseAsync(client, requestPacket.ToArray(), 4);
 
                     await Task.WhenAll(pingTask, responseTask);

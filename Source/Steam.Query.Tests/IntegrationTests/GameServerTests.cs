@@ -78,12 +78,44 @@ namespace Steam.Query.Tests.IntegrationTests
             {
                 try
                 {
-                    var serverInfo = await _servers[i].GetServerInfoAsync().TimeoutAfter(TimeSpan.FromSeconds(3));
+                    var serverInfo = await _servers[i]
+                        .GetServerInfoAsync(forceRefresh: true)
+                        .TimeoutAfter(TimeSpan.FromSeconds(3));
 
                     Assert.That(serverInfo.Gamedir, Is.EqualTo("tf"));
                     Assert.That(serverInfo.Type, Is.EqualTo(GameServerType.Dedicated));
                     Assert.That(serverInfo.Name, Is.Not.Empty);
                     Assert.That(serverInfo.Ping, Is.InRange(1, 800));
+
+                    return;
+                }
+                catch (TimeoutException)
+                {
+
+                }
+            }
+
+            Assert.Fail($"Query timed out on all {GetInfoAttempts} attempt(s)");
+        }
+
+        [Test]
+        public async Task GetServerInfoWithoutPingAsync()
+        {
+            if (!_servers.Any())
+                Assert.Inconclusive();
+
+            for (var i = 0; i < GetInfoAttempts; i++)
+            {
+                try
+                {
+                    var serverInfo = await _servers[i]
+                        .GetServerInfoAsync(forceRefresh: true, checkPing: false)
+                        .TimeoutAfter(TimeSpan.FromSeconds(3));
+
+                    Assert.That(serverInfo.Gamedir, Is.EqualTo("tf"));
+                    Assert.That(serverInfo.Type, Is.EqualTo(GameServerType.Dedicated));
+                    Assert.That(serverInfo.Name, Is.Not.Empty);
+                    Assert.That(serverInfo.Ping, Is.Null);
 
                     return;
                 }
